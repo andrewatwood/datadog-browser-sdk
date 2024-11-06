@@ -8,7 +8,7 @@ import { ONE_KIBI_BYTE } from '../../tools/utils/byteUtils'
 import { objectHasValue } from '../../tools/utils/objectUtils'
 import { assign } from '../../tools/utils/polyfills'
 import { selectSessionStoreStrategyType } from '../session/sessionStore'
-import type { SessionStoreStrategyType } from '../session/storeStrategies/sessionStoreStrategy'
+import type { SessionStoreStrategy, SessionStoreStrategyType } from '../session/storeStrategies/sessionStoreStrategy'
 import { TrackingConsent } from '../trackingConsent'
 import type { TransportConfiguration } from './transportConfiguration'
 import { computeTransportConfiguration } from './transportConfiguration'
@@ -59,6 +59,10 @@ export interface InitConfiguration {
    * @default false
    */
   allowUntrustedEvents?: boolean | undefined
+  /**
+   * Pass a custom {@link SessionStoreStrategy} for managing RUM session lifecycle.
+   */
+  customSessionStoreStrategy?: SessionStoreStrategy | undefined
   /**
    * Store global context and user context in localStorage to preserve them along the user navigation.
    * See [Contexts life cycle](https://docs.datadoghq.com/real_user_monitoring/browser/advanced_configuration/?tab=npm#contexts-life-cycle) for further information.
@@ -169,6 +173,7 @@ interface ReplicaUserConfiguration {
 export interface Configuration extends TransportConfiguration {
   // Built from init configuration
   beforeSend: GenericBeforeSendCallback | undefined
+  customSessionStoreStrategy: SessionStoreStrategy | undefined
   sessionStoreStrategyType: SessionStoreStrategyType | undefined
   sessionSampleRate: number
   telemetrySampleRate: number
@@ -246,6 +251,7 @@ export function validateAndBuildConfiguration(initConfiguration: InitConfigurati
     {
       beforeSend:
         initConfiguration.beforeSend && catchUserErrors(initConfiguration.beforeSend, 'beforeSend threw an error:'),
+      customSessionStoreStrategy: initConfiguration.customSessionStoreStrategy,
       sessionStoreStrategyType: selectSessionStoreStrategyType(initConfiguration),
       sessionSampleRate: initConfiguration.sessionSampleRate ?? 100,
       telemetrySampleRate: initConfiguration.telemetrySampleRate ?? 20,

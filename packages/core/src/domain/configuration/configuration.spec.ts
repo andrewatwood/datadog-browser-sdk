@@ -101,10 +101,28 @@ describe('validateAndBuildConfiguration', () => {
   })
 
   describe('sessionStoreStrategyType', () => {
+    const customSessionStoreStrategy: SessionStoreStrategy = {
+      expireSession: noop,
+      isLockEnabled: false,
+      retrieveSession: () => ({}),
+      persistSession: noop,
+    }
+
     it('allowFallbackToLocalStorage should not be enabled by default', () => {
       spyOnProperty(document, 'cookie', 'get').and.returnValue('')
       const configuration = validateAndBuildConfiguration({ clientToken })
       expect(configuration?.sessionStoreStrategyType).toBeUndefined()
+    })
+
+    it('should use custom strategy if provided, even when cookies are available', () => {
+      const configuration = validateAndBuildConfiguration({ clientToken, customSessionStoreStrategy })
+      expect(configuration?.sessionStoreStrategyType?.type).toBe('Custom')
+      if (configuration?.sessionStoreStrategyType?.type === 'Custom') {
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.expireSession).toBeInstanceOf(Function)
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.retrieveSession).toBeInstanceOf(Function)
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.persistSession).toBeInstanceOf(Function)
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.isLockEnabled).toBe(false)
+      }
     })
 
     it('should contain cookie in the configuration by default', () => {
@@ -134,6 +152,23 @@ describe('validateAndBuildConfiguration', () => {
       spyOn(Storage.prototype, 'getItem').and.throwError('unavailable')
       const configuration = validateAndBuildConfiguration({ clientToken, allowFallbackToLocalStorage: true })
       expect(configuration?.sessionStoreStrategyType).toBeUndefined()
+    })
+
+    it('should contain custom strategy when present if both cookies and local storage are unavailable', () => {
+      spyOnProperty(document, 'cookie', 'get').and.returnValue('')
+      spyOn(Storage.prototype, 'getItem').and.throwError('unavailable')
+      const configuration = validateAndBuildConfiguration({
+        clientToken,
+        allowFallbackToLocalStorage: true,
+        customSessionStoreStrategy,
+      })
+      expect(configuration?.sessionStoreStrategyType?.type).toBe('Custom')
+      if (configuration?.sessionStoreStrategyType?.type === 'Custom') {
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.expireSession).toBeInstanceOf(Function)
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.retrieveSession).toBeInstanceOf(Function)
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.persistSession).toBeInstanceOf(Function)
+        expect(configuration?.sessionStoreStrategyType?.sessionStoreStrategy.isLockEnabled).toBe(false)
+      }
     })
   })
 

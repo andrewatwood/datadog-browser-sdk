@@ -7,6 +7,8 @@ import {
   isExperimentalFeatureEnabled,
   resetExperimentalFeatures,
 } from '../../tools/experimentalFeatures'
+import { noop } from '../../tools/utils/functionUtils'
+import type { SessionStoreStrategy, SessionStoreStrategyMethod } from '../session/storeStrategies/sessionStoreStrategy'
 import { TrackingConsent } from '../trackingConsent'
 import type { InitConfiguration } from './configuration'
 import { serializeConfiguration, validateAndBuildConfiguration } from './configuration'
@@ -238,6 +240,69 @@ describe('validateAndBuildConfiguration', () => {
     it('should validate the version parameter', () => {
       validateAndBuildConfiguration({ clientToken, version: 0 as any })
       expect(displaySpy).toHaveBeenCalledOnceWith('Version must be defined as a string')
+    })
+  })
+
+  describe('customSessionStoreStrategy validation', () => {
+    const baseCustomSessionStoreStrategy: SessionStoreStrategy = {
+      expireSession: noop,
+      persistSession: noop,
+      retrieveSession: () => ({}),
+      isLockEnabled: false,
+    }
+
+    ;(['expireSession', 'persistSession', 'retrieveSession'] satisfies SessionStoreStrategyMethod[]).forEach(
+      (method) => {
+        it(`should validate the ${method} method`, () => {
+          validateAndBuildConfiguration({
+            clientToken,
+            customSessionStoreStrategy: {
+              ...baseCustomSessionStoreStrategy,
+              [method]: true,
+            },
+          })
+          expect(displaySpy).toHaveBeenCalledOnceWith(`customSessionStoreStrategy.${method} should be a function`)
+        })
+      }
+    )
+
+    it('should wrap all methods on the strategy for error handling', () => {
+      const error = new Error('Method failed')
+      const customSessionStoreStrategy: SessionStoreStrategy = {
+        isLockEnabled: true,
+        expireSession: () => {
+          throw error
+        },
+        retrieveSession: () => {
+          throw error
+          // eslint-disable-next-line no-unreachable
+          return {}
+        },
+        persistSession: () => {
+          throw error
+        },
+      }
+
+      const expireSpy = spyOn(customSessionStoreStrategy, 'expireSession').and.callThrough()
+      const retrieveSpy = spyOn(customSessionStoreStrategy, 'retrieveSession').and.callThrough()
+      const persistSpy = spyOn(customSessionStoreStrategy, 'persistSession').and.callThrough()
+
+      const configuration = validateAndBuildConfiguration({ clientToken, customSessionStoreStrategy })
+      expect(configuration?.customSessionStoreStrategy).toBeDefined()
+      expect(configuration?.customSessionStoreStrategy).not.toBe(customSessionStoreStrategy)
+      expect(configuration?.customSessionStoreStrategy).not.toEqual(customSessionStoreStrategy)
+
+      expect(configuration?.customSessionStoreStrategy?.expireSession()).toBeUndefined()
+      expect(displaySpy).toHaveBeenCalledWith('customSessionStoryStrategy.expireSession threw an error', error)
+      expect(expireSpy).toHaveBeenCalled()
+
+      expect(configuration?.customSessionStoreStrategy?.persistSession({})).toBeUndefined()
+      expect(displaySpy).toHaveBeenCalledWith('customSessionStoryStrategy.persistSession threw an error', error)
+      expect(persistSpy).toHaveBeenCalledWith({})
+
+      expect(configuration?.customSessionStoreStrategy?.retrieveSession()).toEqual({})
+      expect(displaySpy).toHaveBeenCalledWith('customSessionStoryStrategy.retrieveSession threw an error', error)
+      expect(retrieveSpy).toHaveBeenCalled()
     })
   })
 

@@ -29,7 +29,7 @@ export {
   RumOtherResourceEventDomainContext,
   RumLongTaskEventDomainContext,
 } from '@datadog/browser-rum-core'
-export { DefaultPrivacyLevel } from '@datadog/browser-core'
+export { DefaultPrivacyLevel, SessionStoreStrategy } from '@datadog/browser-core'
 
 const recorderApi = makeRecorderApi(startRecording)
 export const datadogRum = makeRumPublicApi(startRum, recorderApi, { startDeflateWorker, createDeflateEncoder })

@@ -5,6 +5,7 @@ import { throttle } from '../../tools/utils/functionUtils'
 import { generateUUID } from '../../tools/utils/stringUtils'
 import type { InitConfiguration } from '../configuration'
 import { assign } from '../../tools/utils/polyfills'
+import { display } from '../../tools/display'
 import { selectCookieStrategy, initCookieStrategy } from './storeStrategies/sessionInCookie'
 import type { SessionStoreStrategyType } from './storeStrategies/sessionStoreStrategy'
 import {
@@ -38,12 +39,22 @@ export interface SessionStore {
 export const STORAGE_POLL_DELAY = ONE_SECOND
 
 /**
- * Checks if cookies are available as the preferred storage
- * Else, checks if LocalStorage is allowed and available
+ * Returns:
+ * 1. Custom session storage strategy, if available
+ * 2. Cookies strategy, if available and preferred
+ * 3. LocalStorage strategy if allowed and available
  */
 export function selectSessionStoreStrategyType(
   initConfiguration: InitConfiguration
 ): SessionStoreStrategyType | undefined {
+  if (initConfiguration.customSessionStoreStrategy) {
+    display.warn('Using custom session store strategy.')
+    return {
+      type: 'Custom',
+      sessionStoreStrategy: initConfiguration.customSessionStoreStrategy,
+    }
+  }
+
   let sessionStoreStrategyType = selectCookieStrategy(initConfiguration)
   if (!sessionStoreStrategyType && initConfiguration.allowFallbackToLocalStorage) {
     sessionStoreStrategyType = selectLocalStorageStrategy()
@@ -67,9 +78,11 @@ export function startSessionStore<TrackingType extends string>(
   const sessionStateUpdateObservable = new Observable<{ previousState: SessionState; newState: SessionState }>()
 
   const sessionStoreStrategy =
-    sessionStoreStrategyType.type === 'Cookie'
-      ? initCookieStrategy(sessionStoreStrategyType.cookieOptions)
-      : initLocalStorageStrategy()
+    sessionStoreStrategyType.type === 'Custom'
+      ? sessionStoreStrategyType.sessionStoreStrategy
+      : sessionStoreStrategyType.type === 'Cookie'
+        ? initCookieStrategy(sessionStoreStrategyType.cookieOptions)
+        : initLocalStorageStrategy()
   const { expireSession } = sessionStoreStrategy
 
   const watchSessionTimeoutId = setInterval(watchSession, STORAGE_POLL_DELAY)

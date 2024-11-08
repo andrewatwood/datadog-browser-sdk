@@ -16,6 +16,7 @@ import {
 import type { SessionState } from './sessionState'
 import { initLocalStorageStrategy, selectLocalStorageStrategy } from './storeStrategies/sessionInLocalStorage'
 import { processSessionStoreOperations } from './sessionStoreOperations'
+import { initInMemorySessionStoreStrategy, selectInMemorySessionStoreStrategy } from './storeStrategies/sessionInMemory'
 
 export interface SessionStore {
   expandOrRenewSession: () => void
@@ -48,6 +49,9 @@ export function selectSessionStoreStrategyType(
   if (!sessionStoreStrategyType && initConfiguration.allowFallbackToLocalStorage) {
     sessionStoreStrategyType = selectLocalStorageStrategy()
   }
+  if (!sessionStoreStrategyType && initConfiguration.allowFallbackToInMemoryStorage) {
+    sessionStoreStrategyType = selectInMemorySessionStoreStrategy()
+  }
   return sessionStoreStrategyType
 }
 
@@ -67,9 +71,12 @@ export function startSessionStore<TrackingType extends string>(
   const sessionStateUpdateObservable = new Observable<{ previousState: SessionState; newState: SessionState }>()
 
   const sessionStoreStrategy =
-    sessionStoreStrategyType.type === 'Cookie'
-      ? initCookieStrategy(sessionStoreStrategyType.cookieOptions)
-      : initLocalStorageStrategy()
+    sessionStoreStrategyType.type === 'InMemory'
+      ? initInMemorySessionStoreStrategy()
+      : sessionStoreStrategyType.type === 'Cookie'
+        ? initCookieStrategy(sessionStoreStrategyType.cookieOptions)
+        : initLocalStorageStrategy()
+
   const { expireSession } = sessionStoreStrategy
 
   const watchSessionTimeoutId = setInterval(watchSession, STORAGE_POLL_DELAY)

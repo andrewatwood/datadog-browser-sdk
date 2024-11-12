@@ -5,6 +5,7 @@ import { throttle } from '../../tools/utils/functionUtils'
 import { generateUUID } from '../../tools/utils/stringUtils'
 import type { InitConfiguration } from '../configuration'
 import { assign } from '../../tools/utils/polyfills'
+import { display } from '../../tools/display'
 import { selectCookieStrategy, initCookieStrategy } from './storeStrategies/sessionInCookie'
 import type { SessionStoreStrategyType } from './storeStrategies/sessionStoreStrategy'
 import {
@@ -16,6 +17,7 @@ import {
 import type { SessionState } from './sessionState'
 import { initLocalStorageStrategy, selectLocalStorageStrategy } from './storeStrategies/sessionInLocalStorage'
 import { processSessionStoreOperations } from './sessionStoreOperations'
+import { initInMemorySessionStoreStrategy, selectInMemorySessionStoreStrategy } from './storeStrategies/sessionInMemory'
 
 export interface SessionStore {
   expandOrRenewSession: () => void
@@ -48,6 +50,10 @@ export function selectSessionStoreStrategyType(
   if (!sessionStoreStrategyType && initConfiguration.allowFallbackToLocalStorage) {
     sessionStoreStrategyType = selectLocalStorageStrategy()
   }
+  if (!sessionStoreStrategyType && initConfiguration.allowFallbackToInMemoryStorage) {
+    display.warn('Using in-memory session storage strategy.')
+    sessionStoreStrategyType = selectInMemorySessionStoreStrategy()
+  }
   return sessionStoreStrategyType
 }
 
@@ -67,9 +73,12 @@ export function startSessionStore<TrackingType extends string>(
   const sessionStateUpdateObservable = new Observable<{ previousState: SessionState; newState: SessionState }>()
 
   const sessionStoreStrategy =
-    sessionStoreStrategyType.type === 'Cookie'
-      ? initCookieStrategy(sessionStoreStrategyType.cookieOptions)
-      : initLocalStorageStrategy()
+    sessionStoreStrategyType.type === 'InMemory'
+      ? initInMemorySessionStoreStrategy()
+      : sessionStoreStrategyType.type === 'Cookie'
+        ? initCookieStrategy(sessionStoreStrategyType.cookieOptions)
+        : initLocalStorageStrategy()
+
   const { expireSession } = sessionStoreStrategy
 
   const watchSessionTimeoutId = setInterval(watchSession, STORAGE_POLL_DELAY)

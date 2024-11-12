@@ -5,6 +5,7 @@ import { throttle } from '../../tools/utils/functionUtils'
 import { generateUUID } from '../../tools/utils/stringUtils'
 import type { InitConfiguration } from '../configuration'
 import { assign } from '../../tools/utils/polyfills'
+import { display } from '../../tools/display'
 import { selectCookieStrategy, initCookieStrategy } from './storeStrategies/sessionInCookie'
 import type { SessionStoreStrategyType } from './storeStrategies/sessionStoreStrategy'
 import {
@@ -50,6 +51,7 @@ export function selectSessionStoreStrategyType(
     sessionStoreStrategyType = selectLocalStorageStrategy()
   }
   if (!sessionStoreStrategyType && initConfiguration.allowFallbackToInMemoryStorage) {
+    display.warn('Using in-memory session storage strategy.')
     sessionStoreStrategyType = selectInMemorySessionStoreStrategy()
   }
   return sessionStoreStrategyType

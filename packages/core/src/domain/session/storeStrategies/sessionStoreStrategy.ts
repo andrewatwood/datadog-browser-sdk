@@ -3,11 +3,18 @@ import type { SessionState } from '../sessionState'
 
 export const SESSION_STORE_KEY = '_dd_s'
 
-export type SessionStoreStrategyType = { type: 'Cookie'; cookieOptions: CookieOptions } | { type: 'LocalStorage' }
+export type SessionStoreStrategyType =
+  | { type: 'Cookie'; cookieOptions: CookieOptions }
+  | { type: 'LocalStorage' }
+  | { type: 'Custom'; sessionStoreStrategy: SessionStoreStrategy }
 
 export interface SessionStoreStrategy {
   isLockEnabled: boolean
   persistSession: (session: SessionState) => void
   retrieveSession: () => SessionState
   expireSession: () => void
+}
+
+export type SessionStoreStrategyMethod = keyof {
+  [K in keyof SessionStoreStrategy as SessionStoreStrategy[K] extends (...args: any[]) => unknown ? K : never]: K
 }

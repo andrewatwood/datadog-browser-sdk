@@ -127,7 +127,7 @@ export { CustomerDataType } from './domain/context/contextConstants'
 export { createValueHistory, ValueHistory, ValueHistoryEntry, CLEAR_OLD_VALUES_INTERVAL } from './tools/valueHistory'
 export { readBytesFromStream } from './tools/readBytesFromStream'
 export { STORAGE_POLL_DELAY } from './domain/session/sessionStore'
-export { SESSION_STORE_KEY } from './domain/session/storeStrategies/sessionStoreStrategy'
+export { SESSION_STORE_KEY, SessionStoreStrategy } from './domain/session/storeStrategies/sessionStoreStrategy'
 export {
   willSyntheticsInjectRum,
   getSyntheticsTestId,

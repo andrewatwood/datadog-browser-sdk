@@ -8,7 +8,11 @@ import { ONE_KIBI_BYTE } from '../../tools/utils/byteUtils'
 import { objectHasValue } from '../../tools/utils/objectUtils'
 import { assign } from '../../tools/utils/polyfills'
 import { selectSessionStoreStrategyType } from '../session/sessionStore'
-import type { SessionStoreStrategyType } from '../session/storeStrategies/sessionStoreStrategy'
+import type {
+  SessionStoreStrategy,
+  SessionStoreStrategyMethod,
+  SessionStoreStrategyType,
+} from '../session/storeStrategies/sessionStoreStrategy'
 import { TrackingConsent } from '../trackingConsent'
 import type { TransportConfiguration } from './transportConfiguration'
 import { computeTransportConfiguration } from './transportConfiguration'
@@ -59,6 +63,10 @@ export interface InitConfiguration {
    * @default false
    */
   allowUntrustedEvents?: boolean | undefined
+  /**
+   * Pass a custom {@link SessionStoreStrategy} for managing RUM session lifecycle.
+   */
+  customSessionStoreStrategy?: SessionStoreStrategy | undefined
   /**
    * Store global context and user context in localStorage to preserve them along the user navigation.
    * See [Contexts life cycle](https://docs.datadoghq.com/real_user_monitoring/browser/advanced_configuration/?tab=npm#contexts-life-cycle) for further information.
@@ -169,6 +177,7 @@ interface ReplicaUserConfiguration {
 export interface Configuration extends TransportConfiguration {
   // Built from init configuration
   beforeSend: GenericBeforeSendCallback | undefined
+  customSessionStoreStrategy: SessionStoreStrategy | undefined
   sessionStoreStrategyType: SessionStoreStrategyType | undefined
   sessionSampleRate: number
   telemetrySampleRate: number
@@ -215,6 +224,15 @@ export function isSampleRate(sampleRate: unknown, name: string) {
   return true
 }
 
+export function isFunction(value: unknown, path: string) {
+  if (!value || typeof value !== 'function') {
+    display.error(`${path} should be a function`)
+    return false
+  }
+
+  return true
+}
+
 export function validateAndBuildConfiguration(initConfiguration: InitConfiguration): Configuration | undefined {
   if (!initConfiguration || !initConfiguration.clientToken) {
     display.error('Client Token is not configured, we will not send any data.')
@@ -242,10 +260,46 @@ export function validateAndBuildConfiguration(initConfiguration: InitConfigurati
     return
   }
 
+  let wrappedCustomSessionStoreStrategy: SessionStoreStrategy | undefined
+
+  if (initConfiguration.customSessionStoreStrategy !== undefined) {
+    const strategyMethods = [
+      'expireSession',
+      'persistSession',
+      'retrieveSession',
+    ] satisfies SessionStoreStrategyMethod[]
+    if (
+      !strategyMethods.every((methodName) =>
+        isFunction(
+          initConfiguration.customSessionStoreStrategy?.[methodName],
+          `customSessionStoreStrategy.${methodName}`
+        )
+      )
+    ) {
+      return
+    }
+
+    const { isLockEnabled, expireSession, persistSession, retrieveSession } =
+      initConfiguration.customSessionStoreStrategy
+
+    const wrappedRetrieveSession = catchUserErrors(
+      retrieveSession,
+      'customSessionStoryStrategy.retrieveSession threw an error'
+    )
+
+    wrappedCustomSessionStoreStrategy = {
+      expireSession: catchUserErrors(expireSession, 'customSessionStoryStrategy.expireSession threw an error'),
+      isLockEnabled,
+      persistSession: catchUserErrors(persistSession, 'customSessionStoryStrategy.persistSession threw an error'),
+      retrieveSession: () => wrappedRetrieveSession() ?? {},
+    }
+  }
+
   return assign(
     {
       beforeSend:
         initConfiguration.beforeSend && catchUserErrors(initConfiguration.beforeSend, 'beforeSend threw an error:'),
+      customSessionStoreStrategy: wrappedCustomSessionStoreStrategy,
       sessionStoreStrategyType: selectSessionStoreStrategyType(initConfiguration),
       sessionSampleRate: initConfiguration.sessionSampleRate ?? 100,
       telemetrySampleRate: initConfiguration.telemetrySampleRate ?? 20,

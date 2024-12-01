@@ -1,5 +1,7 @@
 import type { InitConfiguration } from '../src/domain/configuration'
+import type { SessionState } from '../src/domain/session/sessionState'
 import type { RawTelemetryConfiguration } from '../src/domain/telemetry'
+import { noop } from '../src/tools/utils/functionUtils'
 import type { CamelToSnakeCase, RemoveIndex } from './typeUtils'
 
 // Defines a few constants and types related to the core package configuration, so it can be used in
@@ -12,6 +14,12 @@ import type { CamelToSnakeCase, RemoveIndex } from './typeUtils'
 export const EXHAUSTIVE_INIT_CONFIGURATION: Required<InitConfiguration> = {
   clientToken: 'yes',
   beforeSend: () => true,
+  customSessionStoreStrategy: {
+    expireSession: noop,
+    isLockEnabled: false,
+    persistSession: noop,
+    retrieveSession: () => ({}) satisfies SessionState,
+  },
   sessionSampleRate: 50,
   telemetrySampleRate: 60,
   silentMultipleInit: true,
@@ -74,6 +82,8 @@ export type MapInitConfigurationKey<Key extends string> =
           | 'internalAnalyticsSubdomain'
           | 'replica'
           | 'enableExperimentalFeatures'
+          // TODO: Convert to a flag like `beforeSend` and include in telemetry
+          | 'customSessionStoreStrategy'
       ? never
       : // Other keys are simply snake cased
         CamelToSnakeCase<Key>

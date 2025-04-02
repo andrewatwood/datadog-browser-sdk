@@ -7,8 +7,9 @@ import {
   isExperimentalFeatureEnabled,
   resetExperimentalFeatures,
 } from '../../tools/experimentalFeatures'
+import type { SessionStoreStrategyType } from '../session/storeStrategies/sessionStoreStrategy'
 import { TrackingConsent } from '../trackingConsent'
-import type { InitConfiguration } from './configuration'
+import type { InitConfiguration, Configuration } from './configuration'
 import { serializeConfiguration, validateAndBuildConfiguration } from './configuration'
 
 describe('validateAndBuildConfiguration', () => {
@@ -99,39 +100,92 @@ describe('validateAndBuildConfiguration', () => {
   })
 
   describe('sessionStoreStrategyType', () => {
-    it('allowFallbackToLocalStorage should not be enabled by default', () => {
-      spyOnProperty(document, 'cookie', 'get').and.returnValue('')
-      const configuration = validateAndBuildConfiguration({ clientToken })
-      expect(configuration?.sessionStoreStrategyType).toBeUndefined()
-    })
+    const cookieStrategy = {
+      type: 'Cookie',
+      cookieOptions: { secure: false, crossSite: false, partitioned: false },
+    } satisfies SessionStoreStrategyType
 
-    it('should contain cookie in the configuration by default', () => {
-      const configuration = validateAndBuildConfiguration({ clientToken, allowFallbackToLocalStorage: false })
-      expect(configuration?.sessionStoreStrategyType).toEqual({
-        type: 'Cookie',
-        cookieOptions: { secure: false, crossSite: false, partitioned: false },
+    const localStorageStrategy = {
+      type: 'LocalStorage',
+    } satisfies SessionStoreStrategyType
+
+    const inMemoryStrategy = { type: 'InMemory' } satisfies SessionStoreStrategyType
+
+    const testCases: Array<
+      {
+        description: string
+        disableCookies?: boolean
+        disableStorage?: boolean
+        expectedStrategyType: Configuration['sessionStoreStrategyType']
+      } & Pick<InitConfiguration, 'allowFallbackToInMemoryStorage' | 'allowFallbackToLocalStorage'>
+    > = [
+      {
+        description: 'allowFallbackToLocalStorage should not be enabled by default',
+        disableCookies: true,
+        expectedStrategyType: undefined,
+      },
+      {
+        description: 'allowFallbackToInMemoryStorage should not be enabled by default',
+        disableCookies: true,
+        expectedStrategyType: undefined,
+      },
+      {
+        description: 'should contain cookie strategy in the configuration by default',
+        expectedStrategyType: cookieStrategy,
+      },
+      {
+        description:
+          'should contain localStorage strategy in the configuration when localStorage fallback is enabled and cookies are not available',
+        disableCookies: true,
+        allowFallbackToLocalStorage: true,
+        expectedStrategyType: localStorageStrategy,
+      },
+      {
+        description:
+          'should contain localStorage strategy in the configuration when localStorage and in-memory fallbacks are enabled, and cookies are not available',
+        disableCookies: true,
+        allowFallbackToLocalStorage: true,
+        allowFallbackToInMemoryStorage: true,
+        expectedStrategyType: localStorageStrategy,
+      },
+      {
+        description:
+          'should contain in-memory strategy if fallback is enabled while cookies are disabled, and localStorage fallback is disabled',
+        disableCookies: true,
+        allowFallbackToInMemoryStorage: true,
+        expectedStrategyType: inMemoryStrategy,
+      },
+      {
+        description:
+          'should contain in-memory strategy if fallback is enabled while cookies are disabled, and localStorage is unavailable',
+        disableCookies: true,
+        disableStorage: true,
+        allowFallbackToLocalStorage: true,
+        allowFallbackToInMemoryStorage: true,
+        expectedStrategyType: inMemoryStrategy,
+      },
+      {
+        description:
+          'should not contain any strategy if both cookies and local storage are unavailable, and in-memory fallback is disabled',
+        disableCookies: true,
+        disableStorage: true,
+        expectedStrategyType: undefined,
+      },
+    ]
+
+    testCases.forEach(({ description, disableCookies, disableStorage, expectedStrategyType, ...options }) => {
+      it(description, () => {
+        if (disableCookies) {
+          spyOnProperty(document, 'cookie', 'get').and.returnValue('')
+        }
+
+        if (disableStorage) {
+          spyOn(Storage.prototype, 'getItem').and.throwError('unavailable')
+        }
+
+        const configuration = validateAndBuildConfiguration({ clientToken, ...options })
+        expect(configuration?.sessionStoreStrategyType).toEqual(expectedStrategyType)
       })
-    })
-
-    it('should contain cookie in the configuration when fallback is enabled and cookies are available', () => {
-      const configuration = validateAndBuildConfiguration({ clientToken, allowFallbackToLocalStorage: true })
-      expect(configuration?.sessionStoreStrategyType).toEqual({
-        type: 'Cookie',
-        cookieOptions: { secure: false, crossSite: false, partitioned: false },
-      })
-    })
-
-    it('should contain local storage in the configuration when fallback is enabled and cookies are not available', () => {
-      spyOnProperty(document, 'cookie', 'get').and.returnValue('')
-      const configuration = validateAndBuildConfiguration({ clientToken, allowFallbackToLocalStorage: true })
-      expect(configuration?.sessionStoreStrategyType).toEqual({ type: 'LocalStorage' })
-    })
-
-    it('should not contain any storage if both cookies and local storage are unavailable', () => {
-      spyOnProperty(document, 'cookie', 'get').and.returnValue('')
-      spyOn(Storage.prototype, 'getItem').and.throwError('unavailable')
-      const configuration = validateAndBuildConfiguration({ clientToken, allowFallbackToLocalStorage: true })
-      expect(configuration?.sessionStoreStrategyType).toBeUndefined()
     })
   })
 

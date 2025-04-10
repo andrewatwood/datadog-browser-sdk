@@ -17,7 +17,7 @@ import type { SessionState } from './sessionState'
 import { initLocalStorageStrategy, selectLocalStorageStrategy } from './storeStrategies/sessionInLocalStorage'
 import { processSessionStoreOperations } from './sessionStoreOperations'
 import { SessionPersistence } from './sessionConstants'
-import { selectInMemorySessionStoreStrategy } from './storeStrategies/sessionInMemory'
+import { initInMemorySessionStoreStrategy, selectInMemorySessionStoreStrategy } from './storeStrategies/sessionInMemory'
 
 export interface SessionStore {
   expandOrRenewSession: () => void
@@ -88,7 +88,9 @@ export function startSessionStore<TrackingType extends string>(
   const sessionStoreStrategy =
     sessionStoreStrategyType.type === SessionPersistence.COOKIE
       ? initCookieStrategy(configuration, sessionStoreStrategyType.cookieOptions)
-      : initLocalStorageStrategy(configuration)
+      : sessionStoreStrategyType.type === SessionPersistence.IN_MEMORY
+        ? initInMemorySessionStoreStrategy()
+        : initLocalStorageStrategy(configuration)
   const { expireSession } = sessionStoreStrategy
 
   const watchSessionTimeoutId = setInterval(watchSession, STORAGE_POLL_DELAY)

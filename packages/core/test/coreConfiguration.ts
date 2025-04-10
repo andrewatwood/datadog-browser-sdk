@@ -16,7 +16,6 @@ export const EXHAUSTIVE_INIT_CONFIGURATION: Required<InitConfiguration> = {
   telemetrySampleRate: 60,
   silentMultipleInit: true,
   sessionPersistence: 'cookie',
-  allowFallbackToInMemoryStorage: true,
   allowFallbackToLocalStorage: true,
   allowUntrustedEvents: true,
   storeContextsAcrossPages: true,
@@ -77,7 +76,6 @@ export type MapInitConfigurationKey<Key extends string> =
           | 'internalAnalyticsSubdomain'
           | 'replica'
           | 'enableExperimentalFeatures'
-          | 'allowFallbackToInMemoryStorage'
       ? never
       : // Other keys are simply snake cased
         CamelToSnakeCase<Key>
